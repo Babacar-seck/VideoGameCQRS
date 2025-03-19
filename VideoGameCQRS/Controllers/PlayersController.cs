@@ -2,10 +2,13 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using VideoGameCQRS.Data;
+using VideoGameCQRS.Features.Players.Command.CreatePlayer;
+using VideoGameCQRS.Features.Players.Queries.GetPlayerById;
 using VideoGameCQRS.Models;
 
 namespace VideoGameCQRS.Controllers
@@ -16,9 +19,11 @@ namespace VideoGameCQRS.Controllers
     {
         private readonly VideoGameAppDbContext _context;
 
-        public PlayersController(VideoGameAppDbContext context)
+        private readonly ISender _sender;
+        public PlayersController(VideoGameAppDbContext context, ISender sender)
         {
             _context = context;
+            _sender = sender;
         }
 
         // GET: api/Players
@@ -30,16 +35,16 @@ namespace VideoGameCQRS.Controllers
 
         // GET: api/Players/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<Player>> GetPlayer(int id)
+        public  Task<ActionResult<Player>> GetPlayer(int id)
         {
-            var player = await _context.Players.FindAsync(id);
+            var player = _sender.Send( new GetPlayerByIdQuery(id));
 
-            if (player == null)
+            if (player is null)
             {
-                return NotFound();
+                return Task.FromResult<ActionResult<Player>>(NotFound());
             }
 
-            return player;
+            return Task.FromResult<ActionResult<Player>>(Ok(player));
         }
 
         // PUT: api/Players/5
@@ -76,10 +81,9 @@ namespace VideoGameCQRS.Controllers
         // POST: api/Players
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Player>> PostPlayer(Player player)
+        public ActionResult<Player> PostPlayer(CreatePlayerCommand command)
         {
-            _context.Players.Add(player);
-            await _context.SaveChangesAsync();
+            var player = _sender.Send(command);
 
             return CreatedAtAction("GetPlayer", new { id = player.Id }, player);
         }
